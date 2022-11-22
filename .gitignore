@@ -1,0 +1,10 @@
+# ignore python cache files
+*.pyc
+cogs/__pycache__/*
+
+# ignore the top secret NSA files (api token & config)
+stockBotConfig.py
+
+# ignore garbage made by VSCode
+build/
+.vscode/
