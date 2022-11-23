@@ -3,7 +3,7 @@ import os
 import urllib
 import time
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 coolIntents = discord.Intents.default()
 coolIntents.members = True
