@@ -15,6 +15,9 @@ maxPriceAge = 600 # 10 minutes
 
 # table of ticker prices and their ages
 # used to save and reuse stock prices in the short term to save on API calls
+#{
+#  "ticker" : (price, timestamp),
+#}
 priceCache = {}
 
 class Account():
@@ -78,6 +81,8 @@ def getPrice(ticker:str = ""):
     if not data:
         return None
     price = float(data["05. price"])
+    # put this price into the cache for later use
+    priceCache[ticker] = (price, time.time())
     return price
 
 class Stocks(commands.Cog):
@@ -94,13 +99,32 @@ class Stocks(commands.Cog):
 
     @commands.command()
     async def price(self, ctx, ticker):
-        price = self.getPrice(ticker)
+        price = getPrice(ticker)
 
         if not price:
-            return await ctx.send("Rate limited or invalid ticker, please try again in 1 minute")
+            return await ctx.send("Could not gett ticker price, check the ticker and try again in 1 minute")
         
         return await ctx.send(f"({ticker.upper()}) current price: {price}")
 
+    @commands.command()
+    async def buy(self, ctx, ticker:str, quantity:int = 1):
+        ticker = ticker.upper()
+        authorID = ctx.author.id
+        account = loadAccount(authorID)
+        price = getPrice(ticker)
+        if not price:
+            return await ctx.send("Could not gett ticker price, check the ticker and try again in 1 minute")
+        priceTotal = price * quantity
+
+        # can the user afford this purchase
+        if priceTotal > account.cashOnHand:
+            return await ctx.send(f"You cannot afford to buy {quantity} shares of {ticker} (${priceTotal}). You only have (${account.cashOnHand})")
+
+        # actually buying the shares
+        account.cashOnHand += -priceTotal
+        account.portfolio[ticker] = account.portfolio.get(ticker, 0) + quantity
+        account.save()
+        return await ctx.send(f"You have bought {quantity} shares of {ticker} for ${priceTotal}")
 
 
 def setup(client):
