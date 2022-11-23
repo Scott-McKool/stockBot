@@ -1,13 +1,21 @@
 import os
+import json
+import time
 import discord
 import requests
 import stockBotConfig
 from discord.ext import commands
-import json
 
-accountsDir = stockBotConfig.BOT_DIR+"accounts/"
+accountsDir = "accounts/"
 
 startingMoney = 10000
+
+# how long should the script remember a price for before using the API to fetch the most recent price (seconds)
+maxPriceAge = 600 # 10 minutes
+
+# table of ticker prices and their ages
+# used to save and reuse stock prices in the short term to save on API calls
+priceCache = {}
 
 class Account():
     def __init__(self, id, cashOnHand:int = startingMoney, portfolio:dict = {}) -> None:
@@ -25,13 +33,13 @@ class Account():
         return value
 
     def save(self):
-        with open(f"{accountsDir}{self.id}.json", "wt") as file:
+        with open(f"{accountsDir}{self.id}", "wt") as file:
             file.write(self.__str__())
 
 def loadAccount(id:int):
     for file in os.listdir(accountsDir):
-        if file == id:
-            f = open("12345")
+        if int(file) == id:
+            f = open(f"{accountsDir}{file}")
             accData = json.load(f)
             f.close()
             acc = Account(**accData)
@@ -40,6 +48,7 @@ def loadAccount(id:int):
     # so make a new one
     print(f"making new account #{id}")
     acc = Account(id)
+    acc.save()
     return acc
 
 
@@ -47,9 +56,8 @@ def getData(ticker:str = ""):
     ticker = ticker.upper()
     # qeuery the API
     data = requests.get(f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={stockBotConfig.API_TOKEN}")
-
     obj = data.json()
-    print(obj)
+
     # check for rate limit error
     if "Note" in obj:
         return None
@@ -58,10 +66,18 @@ def getData(ticker:str = ""):
     return obj
 
 def getPrice(ticker:str = ""):
+    ticker = ticker.upper()
+    # search the price cache
+    if ticker in priceCache:
+        # check the age of the data
+        # if the age of this price is less than the max, reuse it
+        if time.time() - priceCache[ticker][1] < maxPriceAge:
+            return priceCache[ticker][0]
+    # otherwise get the price from the API
     data = getData(ticker)
     if not data:
         return None
-    price = data["05. price"]
+    price = float(data["05. price"])
     return price
 
 class Stocks(commands.Cog):
@@ -84,6 +100,7 @@ class Stocks(commands.Cog):
             return await ctx.send("Rate limited or invalid ticker, please try again in 1 minute")
         
         return await ctx.send(f"({ticker.upper()}) current price: {price}")
+
 
 
 def setup(client):
