@@ -6,8 +6,7 @@ import requests
 import stockBotConfig
 from discord.ext import commands
 
-accountsDir = "accounts/"
-
+# how many dollars does a new acount hove to start with
 startingMoney = 10000
 
 # how long should the script remember a price for before using the API to fetch the most recent price (seconds)
@@ -19,6 +18,8 @@ maxPriceAge = 600 # 10 minutes
 #  "ticker" : (price, timestamp),
 #}
 priceCache = {}
+
+accountsDir = stockBotConfig.BOT_DIR+"accounts/"
 
 class Account():
     def __init__(self, id, cashOnHand:int = startingMoney, portfolio:dict = {}) -> None:
@@ -47,7 +48,7 @@ def loadAccount(id:int):
             f.close()
             acc = Account(**accData)
             return acc
-    # if we made it past the loop that means no account exists with this ID
+    # if past the loop that means no account exists with this ID
     # so make a new one
     print(f"making new account #{id}")
     acc = Account(id)
@@ -56,7 +57,6 @@ def loadAccount(id:int):
 
 
 def getData(ticker:str = ""):
-    ticker = ticker.upper()
     # qeuery the API
     data = requests.get(f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={stockBotConfig.API_TOKEN}")
     obj = data.json()
@@ -69,7 +69,6 @@ def getData(ticker:str = ""):
     return obj
 
 def getPrice(ticker:str = ""):
-    ticker = ticker.upper()
     # search the price cache
     if ticker in priceCache:
         # check the age of the data
@@ -98,13 +97,22 @@ class Stocks(commands.Cog):
         print("Stocks Cog is ready")
 
     @commands.command()
-    async def price(self, ctx, ticker):
+    async def price(self, ctx, ticker:str):
+        ticker = ticker.upper()
         price = getPrice(ticker)
 
         if not price:
             return await ctx.send("Could not gett ticker price, check the ticker and try again in 1 minute")
         
-        return await ctx.send(f"({ticker.upper()}) current price: {price}")
+        return await ctx.send(f"({ticker}) current price: {price}")
+
+    @commands.command()
+    async def portfolio(self, ctx, member:discord.member = None):
+        if not member:
+            member = ctx.author
+        accountID = member.id
+        acc = loadAccount(accountID)
+        return await ctx.send(str(acc))
 
     @commands.command()
     async def buy(self, ctx, ticker:str, quantity:int = 1):
@@ -125,6 +133,24 @@ class Stocks(commands.Cog):
         account.portfolio[ticker] = account.portfolio.get(ticker, 0) + quantity
         account.save()
         return await ctx.send(f"You have bought {quantity} shares of {ticker} for ${priceTotal}")
+
+    @commands.command()
+    async def sell(self, ctx, ticker:str, quantity:int = 1):
+        ticker = ticker.upper()
+        authorID = ctx.author.id
+        account = loadAccount(authorID)
+        # check if the user has enough shares
+        sharesOwned = account.portfolio.get(ticker, 0)
+        if quantity > sharesOwned:
+            return await ctx.send(f"Cannot sell {quantity} shares of {ticker}, you only own {sharesOwned} shares")
+        price = getPrice(ticker)
+        priceTotal = price * quantity
+
+        # actually selling the shares
+        account.cashOnHand += priceTotal
+        account.portfolio[ticker] = account.portfolio.get(ticker, 0) - quantity
+        account.save()
+        return await ctx.send(f"You have sold {quantity} shares of {ticker} for ${priceTotal}")
 
 
 def setup(client):
