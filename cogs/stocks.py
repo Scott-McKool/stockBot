@@ -32,7 +32,7 @@ class Account():
 
     def totalValue(self):
         value = self.cashOnHand
-        for stock, quantity in self.portfolio:
+        for stock, quantity in self.portfolio.items():
             value += getPrice(stock) * quantity
         return value
 
@@ -78,7 +78,7 @@ def getPrice(ticker:str = ""):
     # otherwise get the price from the API
     data = getData(ticker)
     if not data:
-        return None
+        return -1
     price = float(data["05. price"])
     # put this price into the cache for later use
     priceCache[ticker] = (price, time.time())
@@ -97,14 +97,16 @@ class Stocks(commands.Cog):
         print("Stocks Cog is ready")
 
     @commands.command()
-    async def price(self, ctx, ticker:str):
+    async def price(self, ctx, ticker:str, quantity:int = 1):
         ticker = ticker.upper()
         price = getPrice(ticker)
 
         if not price:
             return await ctx.send("Could not gett ticker price, check the ticker and try again in 1 minute")
         
-        return await ctx.send(f"({ticker}) current price: {price}")
+        totalPrice = price * quantity
+
+        return await ctx.send(f"Price of {quantity} {ticker} shares: {totalPrice}")
 
     @commands.command()
     async def portfolio(self, ctx, member:discord.member = None):
@@ -112,7 +114,20 @@ class Stocks(commands.Cog):
             member = ctx.author
         accountID = member.id
         acc = loadAccount(accountID)
-        return await ctx.send(str(acc))
+
+        totalValue = acc.cashOnHand
+        messageString = ""
+        for stock, quantity in acc.portfolio.items():
+            if quantity < 1:
+                continue
+            price = getPrice(stock)
+            value = price*quantity
+            totalValue += value
+            messageString += f"{stock.ljust(6)} | {str(quantity).rjust(3)} | {str(round(price, 2)).rjust(7)} | {str(round(value,2))}\n"
+        # prepend the header now that the total value is calculated
+        messageString = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cashOnHand}\nTotal account value: ${totalValue:.2f}\n----------------------------------------\nSymbol | Qty |  price  | total value\n" + messageString
+        messageString += "```"
+        return await ctx.send(messageString)
 
     @commands.command()
     async def buy(self, ctx, ticker:str, quantity:int = 1):
