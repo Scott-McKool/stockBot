@@ -27,13 +27,19 @@ class Account():
         self.cashOnHand = cashOnHand
         self.portfolio = portfolio
 
+        # the portfolio keeps track of the stocks owned and the money spent on a stock to keep track of returns
+        # portfolio dictionary
+        # {
+        #     "ticker" : [quantity owned, money spent]
+
     def __str__(self) -> str:
         return json.dumps(self.__dict__, indent=4)
 
     def totalValue(self):
         value = self.cashOnHand
-        for stock, quantity in self.portfolio.items():
-            value += getPrice(stock) * quantity
+        for ticker, stockStats in self.portfolio.items():
+            quantity, _ = stockStats
+            value += getPrice(ticker) * quantity
         return value
 
     def save(self):
@@ -109,7 +115,7 @@ class Stocks(commands.Cog):
         return await ctx.send(f"Price of {quantity} {ticker} shares: {totalPrice}")
 
     @commands.command()
-    async def portfolio(self, ctx, member:discord.member = None):
+    async def portfolio(self, ctx, member:discord.Member = None):
         if not member:
             member = ctx.author
         accountID = member.id
@@ -117,15 +123,19 @@ class Stocks(commands.Cog):
 
         totalValue = acc.cashOnHand
         messageString = ""
-        for stock, quantity in acc.portfolio.items():
+        for ticker, stockStats in acc.portfolio.items():
+            quantity, moneySpent = stockStats
             if quantity < 1:
                 continue
-            price = getPrice(stock)
+            price = getPrice(ticker)
             value = price*quantity
             totalValue += value
-            messageString += f"{stock.ljust(6)} | {str(quantity).rjust(3)} | {str(round(price, 2)).rjust(7)} | {str(round(value,2))}\n"
+            profit = round(value - moneySpent, 2)
+            profitPercent = round(100 * profit / moneySpent, 2)
+            profitString = "▲"*(profit > 0) + "▼"*(profit<0) + '${:.2f}'.format(profit) + f" ({'{:.2f}'.format(profitPercent)}%)"
+            messageString += f"{ticker.ljust(6)} | {str(quantity).rjust(3)} | {'{:.2f}'.format(price).rjust(7)} | {'{:.2f}'.format(value).rjust(8)} | {profitString}\n"
         # prepend the header now that the total value is calculated
-        messageString = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cashOnHand}\nTotal account value: ${totalValue:.2f}\n----------------------------------------\nSymbol | Qty |  price  | total value\n" + messageString
+        messageString = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cashOnHand:.2f}\nTotal account value: ${totalValue:.2f}\n----------------------------------------\nticker | Qty |  price  |  $value  | profit\n" + messageString
         messageString += "```"
         return await ctx.send(messageString)
 
@@ -135,8 +145,8 @@ class Stocks(commands.Cog):
         authorID = ctx.author.id
         account = loadAccount(authorID)
         price = getPrice(ticker)
-        if not price:
-            return await ctx.send("Could not gett ticker price, check the ticker and try again in 1 minute")
+        if price < 0:
+            return await ctx.send("Could not get ticker price, check the ticker and try again in 1 minute")
         priceTotal = price * quantity
 
         # can the user afford this purchase
@@ -145,7 +155,11 @@ class Stocks(commands.Cog):
 
         # actually buying the shares
         account.cashOnHand += -priceTotal
-        account.portfolio[ticker] = account.portfolio.get(ticker, 0) + quantity
+        account.portfolio[ticker] = account.portfolio.get(ticker, [0, 0])
+        # update the quantity owned
+        account.portfolio[ticker][0] = account.portfolio[ticker][0] + quantity
+        # update the total money spent on this stock
+        account.portfolio[ticker][1] = account.portfolio[ticker][1] + priceTotal
         account.save()
         return await ctx.send(f"You have bought {quantity} shares of {ticker} for ${priceTotal}")
 
@@ -155,15 +169,21 @@ class Stocks(commands.Cog):
         authorID = ctx.author.id
         account = loadAccount(authorID)
         # check if the user has enough shares
-        sharesOwned = account.portfolio.get(ticker, 0)
+        account.portfolio[ticker] = account.portfolio.get(ticker, [0, 0])
+        sharesOwned = account.portfolio[ticker][0]
         if quantity > sharesOwned:
             return await ctx.send(f"Cannot sell {quantity} shares of {ticker}, you only own {sharesOwned} shares")
         price = getPrice(ticker)
+        if price < 0:
+            return await ctx.send("Could not get ticker price, check the ticker and try again in 1 minute")
         priceTotal = price * quantity
 
         # actually selling the shares
-        account.cashOnHand += priceTotal
-        account.portfolio[ticker] = account.portfolio.get(ticker, 0) - quantity
+        account.cashOnHand += -priceTotal
+        # update the quantity owned
+        account.portfolio[ticker][0] = account.portfolio[ticker][0] - quantity
+        # update the total money spent on this stock
+        account.portfolio[ticker][1] = account.portfolio[ticker][1] - priceTotal
         account.save()
         return await ctx.send(f"You have sold {quantity} shares of {ticker} for ${priceTotal}")
 
