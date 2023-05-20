@@ -1,12 +1,12 @@
 from discord.ext import commands
 import stockBotConfig
 import discord
+import asyncio
 import urllib
 import time
 import os
 
-coolIntents = discord.Intents.default()
-coolIntents.members = True
+coolIntents = discord.Intents.all()
 
 bot = commands.Bot(command_prefix=stockBotConfig.PREFIX, intents=coolIntents)
 
@@ -24,7 +24,7 @@ async def ping(ctx):
 # load the cogs for this bot
 for filename in os.listdir(f"{stockBotConfig.BOT_DIR}cogs"):
     if(filename.endswith(".py")):
-        bot.load_extension(f"cogs.{filename[:-3]}")
+        asyncio.run(bot.load_extension(f"cogs.{filename[:-3]}"))
 
 # wait till an internet connection is established before trying to login
 while(True):
