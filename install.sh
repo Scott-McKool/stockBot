@@ -6,16 +6,12 @@
 # get discord token from user
 echo "get the bot's token from the discord dev portal and enter it here: "
 read DISCORDTOKEN 
-# get API token from user
-echo "get a free token from https://www.alphavantage.co/support/#api-key and then paste it here: "
-read APITOKEN 
 
 # make a config file for inportant variables
-echo "creating config file 'justinConfig.py'"
-    cat > justinConfig.py <<CONFIGFILE
+echo "creating config file 'stockBotConfig.py'"
+    cat > stockBotConfig.py <<CONFIGFILE
 PREFIX = "$"
 DISCORD_TOKEN = "$DISCORDTOKEN"
-API_TOKEN = "$APITOKEN"
 BOT_DIR = "$PWD/"
 CONFIGFILE
 

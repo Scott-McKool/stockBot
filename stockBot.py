@@ -1,9 +1,9 @@
+from discord.ext import commands
 import stockBotConfig
-import os
+import discord
 import urllib
 import time
-import discord
-from discord.ext import commands
+import os
 
 coolIntents = discord.Intents.default()
 coolIntents.members = True
