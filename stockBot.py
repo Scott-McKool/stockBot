@@ -6,7 +6,7 @@ import urllib
 import time
 import os
 
-bot = commands.Bot(command_prefix=stockBotConfig.PREFIX, intents=discord.Intents.default())
+bot = commands.Bot(command_prefix=stockBotConfig.PREFIX, intents=discord.Intents.all())
 
 @bot.event
 async def on_ready():
