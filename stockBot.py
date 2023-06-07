@@ -6,9 +6,7 @@ import urllib
 import time
 import os
 
-coolIntents = discord.Intents.all()
-
-bot = commands.Bot(command_prefix=stockBotConfig.PREFIX, intents=coolIntents)
+bot = commands.Bot(command_prefix=stockBotConfig.PREFIX, intents=discord.Intents.default())
 
 @bot.event
 async def on_ready():
@@ -22,11 +20,12 @@ async def ping(ctx):
     await ctx.send(f"pong {round(bot.latency*1000)}ms")
 
 # load the cogs for this bot
-for filename in os.listdir(f"{stockBotConfig.BOT_DIR}cogs"):
-    if(filename.endswith(".py")):
-        asyncio.run(bot.load_extension(f"cogs.{filename[:-3]}"))
+for file_name in os.listdir(f"{stockBotConfig.BOT_DIR}cogs"):
+    if(file_name.endswith(".py")):
+        asyncio.run(bot.load_extension(f"cogs.{file_name[:-3]}"))
 
 # wait till an internet connection is established before trying to login
+#TODO this is kind of a hack-y solution, find a better way of running code when internet access is gained
 while(True):
     try:
         # will throw an error if not on internet

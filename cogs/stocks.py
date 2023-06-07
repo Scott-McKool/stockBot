@@ -7,52 +7,26 @@ import json
 import os
 
 # how many dollars does a new acount hove to start with
-startingMoney = 10000
+starting_money = 10000
 
 # how long should the script remember a price for before using the API to fetch the most recent price (seconds)
-maxPriceAge = 0 # 0 seconds
+max_price_age = 0 # 0 seconds
 
 # table of ticker prices and their ages
 # used to save and reuse stock prices in the short term to save on API calls
 #{
 #  "ticker" : (price, timestamp),
 #}
-priceCache = {}
+price_cache = {}
 
-accountsDir = stockBotConfig.BOT_DIR+"accounts/"
-
-class Account():
-    def __init__(self, id, cashOnHand:int = startingMoney, portfolio:dict = {}) -> None:
-        self.id = id
-        self.cashOnHand = cashOnHand
-        self.portfolio = portfolio
-
-        # the portfolio keeps track of the stocks owned and the money spent on a stock to keep track of returns
-        # portfolio dictionary
-        # {
-        #     "ticker" : [quantity owned, money spent]
-
-    def __str__(self) -> str:
-        return json.dumps(self.__dict__, indent=4)
-
-    def totalValue(self):
-        value = self.cashOnHand
-        for ticker, stockStats in self.portfolio.items():
-            quantity, _ = stockStats
-            value += getPrice(ticker) * quantity
-        return value
-
-    def save(self):
-        with open(f"{accountsDir}{self.id}", "wt") as file:
-            file.write(self.__str__())
+accounts_folder = stockBotConfig.BOT_DIR+"accounts/"
 
 def loadAccount(id:int):
-    for file in os.listdir(accountsDir):
+    for file in os.listdir(accounts_folder):
         if int(file) == id:
-            f = open(f"{accountsDir}{file}")
-            accData = json.load(f)
-            f.close()
-            acc = Account(**accData)
+            with open(f"{accounts_folder}{file}") as account_file:
+                account_data = json.load(account_file)
+            acc = Account(**account_data)
             return acc
     # if past the loop that means no account exists with this ID
     # so make a new one
@@ -63,27 +37,53 @@ def loadAccount(id:int):
 
 def getPrice(symbol:str = ""):
     # search the price cache
-    if symbol in priceCache:
+    if symbol in price_cache:
         # check the age of the data
         # if the age of this price is less than the max, reuse it
-        if time.time() - priceCache[symbol][1] < maxPriceAge:
-            return priceCache[symbol][0]
+        if time.time() - price_cache[symbol][1] < max_price_age:
+            return price_cache[symbol][0]
     # otherwise get the price from yahoo finance
     ticker = yf.Ticker(symbol)
     if not ticker.info:
         return -1
     price = round(ticker.fast_info["last_price"], 2)
     # put this price into the cache for later use
-    priceCache[symbol] = (price, time.time())
+    price_cache[symbol] = (price, time.time())
     return price
+
+
+class Account():
+    def __init__(self, id, cash_on_hand:int = starting_money, portfolio:dict = {}) -> None:
+        self.id = id
+        self.cash_on_hand = cash_on_hand
+        self.portfolio = portfolio
+
+        # the portfolio keeps track of the stocks owned and the money spent on a stock to keep track of returns
+        # portfolio dictionary
+        # {
+        #     "ticker" : [quantity owned, money spent]
+
+    def __str__(self) -> str:
+        return json.dumps(self.__dict__, indent=4)
+
+    def total_value(self):
+        value = self.cash_on_hand
+        for ticker, cash_on_hand in self.portfolio.items():
+            quantity, _ = cash_on_hand
+            value += getPrice(ticker) * quantity
+        return value
+
+    def save(self):
+        with open(f"{accounts_folder}{self.id}", "wt") as file:
+            file.write(self.__str__())
 
 class Stocks(commands.Cog):
 
     def __init__(self, client) -> None:
         super().__init__()
         # check for accounts folder
-        if not os.path.exists(accountsDir):
-            os.makedirs(accountsDir)
+        if not os.path.exists(accounts_folder):
+            os.makedirs(accounts_folder)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -99,82 +99,82 @@ class Stocks(commands.Cog):
         if price < 0:
             return await ctx.send("Could not get ticker price, check the name and try again")
         
-        totalPrice = price * quantity
+        total_price = price * quantity
 
-        return await ctx.send(f"Price of {quantity} {ticker} shares: {totalPrice}")
+        return await ctx.send(f"Price of {quantity} {ticker} shares: {total_price}")
 
     @commands.command()
     async def portfolio(self, ctx, member:discord.Member = None):
         if not member:
             member = ctx.author
-        accountID = member.id
-        acc = loadAccount(accountID)
+        account_id = member.id
+        acc = loadAccount(account_id)
 
-        totalValue = acc.cashOnHand
-        messageString = ""
-        for ticker, stockStats in acc.portfolio.items():
-            quantity, moneySpent = stockStats
+        total_value = acc.cash_on_hand
+        message_string = ""
+        for ticker, cash_on_hand in acc.portfolio.items():
+            quantity, money_spent = cash_on_hand
             if quantity < 1:
                 continue
             price = getPrice(ticker)
             value = price*quantity
-            totalValue += value
-            profit = round(value - moneySpent, 2)
-            profitPercent = round(100 * profit / moneySpent, 2)
-            profitString = "▲"*(profit > 0) + "▼"*(profit<0) + '${:.2f}'.format(profit) + f" ({'{:.2f}'.format(profitPercent)}%)"
-            messageString += f"{ticker.ljust(6)} | {str(quantity).rjust(3)} | {'{:.2f}'.format(price).rjust(7)} | {'{:.2f}'.format(value).rjust(8)} | {profitString}\n"
+            total_value += value
+            profit = round(value - money_spent, 2)
+            profit_percent = round(100 * profit / money_spent, 2)
+            profit_string = "▲"*(profit > 0) + "▼"*(profit<0) + '${:.2f}'.format(profit) + f" ({'{:.2f}'.format(profit_percent)}%)"
+            message_string += f"{ticker.ljust(6)} | {str(quantity).rjust(3)} | {'{:.2f}'.format(price).rjust(7)} | {'{:.2f}'.format(value).rjust(8)} | {profit_string}\n"
         # prepend the header now that the total value is calculated
-        messageString = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cashOnHand:.2f}\nTotal account value: ${totalValue:.2f}\n----------------------------------------\nticker | Qty |  price  |  $value  | profit\n" + messageString
-        messageString += "```"
-        return await ctx.send(messageString)
+        message_string = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cash_on_hand:.2f}\nTotal account value: ${total_value:.2f}\n----------------------------------------\nticker | Qty |  price  |  $value  | profit\n" + message_string
+        message_string += "```"
+        return await ctx.send(message_string)
 
     @commands.command()
     async def buy(self, ctx, ticker:str, quantity:int = 1):
         ticker = ticker.upper()
-        authorID = ctx.author.id
-        account = loadAccount(authorID)
+        author_id = ctx.author.id
+        account = loadAccount(author_id)
         price = getPrice(ticker)
         if price < 0:
             return await ctx.send("Could not get ticker price, check the name and try again")
-        priceTotal = round(price * quantity, 2)
+        price_total = round(price * quantity, 2)
 
         # can the user afford this purchase
-        if priceTotal > account.cashOnHand:
-            return await ctx.send(f"You cannot afford to buy {quantity} shares of {ticker} (${priceTotal}). You only have (${account.cashOnHand})")
+        if price_total > account.cash_on_hand:
+            return await ctx.send(f"You cannot afford to buy {quantity} shares of {ticker} (${price_total}). You only have (${account.cash_on_hand})")
 
         # actually buying the shares
-        account.cashOnHand += -priceTotal
+        account.cash_on_hand += -price_total
         account.portfolio[ticker] = account.portfolio.get(ticker, [0, 0])
         # update the quantity owned
         account.portfolio[ticker][0] = account.portfolio[ticker][0] + quantity
         # update the total money spent on this stock
-        account.portfolio[ticker][1] = account.portfolio[ticker][1] + priceTotal
+        account.portfolio[ticker][1] = account.portfolio[ticker][1] + price_total
         account.save()
-        return await ctx.send(f"You have bought {quantity} shares of {ticker} for ${priceTotal}")
+        return await ctx.send(f"You have bought {quantity} shares of {ticker} for ${price_total}")
 
     @commands.command()
     async def sell(self, ctx, ticker:str, quantity:int = 1):
         ticker = ticker.upper()
-        authorID = ctx.author.id
-        account = loadAccount(authorID)
+        author_id = ctx.author.id
+        account = loadAccount(author_id)
         # check if the user has enough shares
         account.portfolio[ticker] = account.portfolio.get(ticker, [0, 0])
-        sharesOwned = account.portfolio[ticker][0]
-        if quantity > sharesOwned:
-            return await ctx.send(f"Cannot sell {quantity} shares of {ticker}, you only own {sharesOwned} shares")
+        shares_owned = account.portfolio[ticker][0]
+        if quantity > shares_owned:
+            return await ctx.send(f"Cannot sell {quantity} shares of {ticker}, you only own {shares_owned} shares")
         price = getPrice(ticker)
         if price < 0:
             return await ctx.send("Could not get ticker price, check the name and try again")
-        priceTotal = round(price * quantity, 2)
+        price_total = round(price * quantity, 2)
 
         # actually selling the shares
-        account.cashOnHand += priceTotal
+        account.cash_on_hand += price_total
         # update the quantity owned
-        account.portfolio[ticker][0] = sharesOwned - quantity
+        account.portfolio[ticker][0] = shares_owned - quantity
         # update the total money spent on this stock
-        account.portfolio[ticker][1] = account.portfolio[ticker][1] * (1 - (quantity / sharesOwned))
+        account.portfolio[ticker][1] = account.portfolio[ticker][1] * (1 - (quantity / shares_owned))
         account.save()
-        return await ctx.send(f"You have sold {quantity} shares of {ticker} for ${priceTotal}")
+        return await ctx.send(f"You have sold {quantity} shares of {ticker} for ${price_total}")
 
 
 async def setup(client):
