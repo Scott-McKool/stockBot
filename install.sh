@@ -19,7 +19,7 @@ chmod 660 stockBotConfig.py
 
 ### install requirements
 echo "installing pip with apt. . ."
-sudo pip3 apt update && apt install python3-pip -y
+sudo apt update && apt install python3-pip -y
 
 # install python packages
 echo "installing requirements with pip3. . ."
