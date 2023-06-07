@@ -35,7 +35,7 @@ Description=Runs stockBot.py script on startup
 Wants=network-online.target
 After=network-online.target
 [Service]
-User=$whoami
+User=$(whoami)
 Group=$(id -gn)
 ExecStart=/usr/bin/python3 "$PWD/stockBot.py"
 [Install]
