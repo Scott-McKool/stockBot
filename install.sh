@@ -19,11 +19,11 @@ chmod 660 stockBotConfig.py
 
 ### install requirements
 echo "installing pip with apt. . ."
-sudo apt update && sudo apt install python3-pip -y
+sudo apt update && sudo apt install python3-pip -y || echo "failed to install python3-pip, aborting. . ." && exit(1)
 
 # install python packages
 echo "installing requirements with pip3. . ."
-pip3 install -r requirements.txt
+pip3 install -r requirements.txt || echo "failed to install pip packages, aborting. . ." && exit(1)
 
 ### use systemd to run stockbot on system startup
 echo "Setting up stockBot.py to run on system startup"
