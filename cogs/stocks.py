@@ -101,7 +101,7 @@ class Stocks(commands.Cog):
         
         total_price = round(price * quantity, 2)
 
-        return await ctx.send(f"Price of {quantity} {ticker} shares: {total_price}")
+        return await ctx.send(f"Price of {quantity} {ticker} shares: {total_price:.2f}")
 
     @commands.command()
     async def portfolio(self, ctx, member:discord.Member = None):
