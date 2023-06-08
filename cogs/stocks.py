@@ -71,7 +71,7 @@ class Account():
         for ticker, cash_on_hand in self.portfolio.items():
             quantity, _ = cash_on_hand
             value += getPrice(ticker) * quantity
-        return value
+        return round(value, 2)
 
     def save(self):
         with open(f"{accounts_folder}{self.id}", "wt") as file:
@@ -99,7 +99,7 @@ class Stocks(commands.Cog):
         if price < 0:
             return await ctx.send("Could not get ticker price, check the name and try again")
         
-        total_price = price * quantity
+        total_price = round(price * quantity, 2)
 
         return await ctx.send(f"Price of {quantity} {ticker} shares: {total_price}")
 
