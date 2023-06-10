@@ -1,4 +1,6 @@
 from discord.ext import commands
+from datetime import datetime
+from pytz import timezone
 import yfinance as yf
 import stockBotConfig
 import discord
@@ -9,38 +11,47 @@ import os
 # how many dollars does a new acount hove to start with
 starting_money = 10000
 
-# how long should the script remember a price for before using the API to fetch the most recent price (seconds)
-max_price_age = 0 # 0 seconds
-
 # table of ticker prices and their ages
 # used to save and reuse stock prices in the short term to save on API calls
+# expire_time is a timestamp for when the data will be too old
 #{
-#  "ticker" : (price, timestamp),
+#  "ticker" : (price, expire_time),
 #}
 price_cache = {}
 
 accounts_folder = stockBotConfig.BOT_DIR+"accounts/"
 
-def loadAccount(id:int):
-    for file in os.listdir(accounts_folder):
+def is_market_open() -> bool:
+    # get the current time in us est timezone 
+    dt = datetime.now(timezone('US/Eastern'))
+    # market is open on weekdays (days 0-4) between 9:30 am and 4:00 pm
+    return 0 <= dt.weekday() <= 4 and 9*60+30 <= dt.hour*60+dt.minute <= 16*60
+
+def loadAccount(id:int, guild_id:int):
+    # if a dir does not exits for this guild
+    if not os.path.exists(f"{accounts_folder}{guild_id}"):
+        # make one
+        os.makedirs(f"{accounts_folder}{guild_id}")
+    # save account info under a file with the user id in a directory of the guild id
+    for file in os.listdir(f"{accounts_folder}{guild_id}"):
         if int(file) == id:
-            with open(f"{accounts_folder}{file}") as account_file:
+            with open(f"{accounts_folder}{guild_id}/{file}") as account_file:
                 account_data = json.load(account_file)
             acc = Account(**account_data)
             return acc
     # if past the loop that means no account exists with this ID
     # so make a new one
     print(f"making new account #{id}")
-    acc = Account(id)
+    acc = Account(id, guild_id)
     acc.save()
     return acc
 
-def getPrice(symbol:str = ""):
+def getPrice(symbol:str):
     # search the price cache
     if symbol in price_cache:
         # check the age of the data
-        # if the age of this price is less than the max, reuse it
-        if time.time() - price_cache[symbol][1] < max_price_age:
+        # if the price has not expired yet
+        if time.time() < price_cache[symbol][1]:
             return price_cache[symbol][0]
     # otherwise get the price from yahoo finance
     ticker = yf.Ticker(symbol)
@@ -48,23 +59,38 @@ def getPrice(symbol:str = ""):
         return -1
     price = round(ticker.fast_info["last_price"], 2)
     # put this price into the cache for later use
-    price_cache[symbol] = (price, time.time())
+    # if the market is closed
+    if not is_market_open():
+        # cache the price for the next 10 minutes (600 seconds)
+        # TODO find a way of getting a timestamp for when the market will next open, and set the expire time to that
+        price_cache[symbol] = (price, time.time() + 600)
     return price
 
 
 class Account():
-    def __init__(self, id, cash_on_hand:int = starting_money, portfolio:dict = {}) -> None:
-        self.id = id
+    def __init__(self, id, guild_id: str, cash_on_hand:int = starting_money, portfolio:dict = {}) -> None:
+        # user id
+        self.id = str(id)
+        # the guild (server) this accound belongs in
+        self.guild_id = str(guild_id)
+        # how many dollars does this accound have available to spend
         self.cash_on_hand = cash_on_hand
-        self.portfolio = portfolio
-
         # the portfolio keeps track of the stocks owned and the money spent on a stock to keep track of returns
         # portfolio dictionary
         # {
         #     "ticker" : [quantity owned, money spent]
+        self.portfolio = portfolio
 
     def __str__(self) -> str:
         return json.dumps(self.__dict__, indent=4)
+
+    def save(self):
+        # if a dir does not exits for this guild
+        if not os.path.exists(f"{accounts_folder}{self.guild_id}"):
+            # make one
+            os.makedirs(f"{accounts_folder}{self.guild_id}")
+        with open(f"{accounts_folder}{self.guild_id}/{self.id}", "wt") as file:
+            file.write(self.__str__())
 
     def total_value(self):
         value = self.cash_on_hand
@@ -72,10 +98,6 @@ class Account():
             quantity, _ = cash_on_hand
             value += getPrice(ticker) * quantity
         return round(value, 2)
-
-    def save(self):
-        with open(f"{accounts_folder}{self.id}", "wt") as file:
-            file.write(self.__str__())
 
 class Stocks(commands.Cog):
 
@@ -108,7 +130,8 @@ class Stocks(commands.Cog):
         if not member:
             member = ctx.author
         account_id = member.id
-        acc = loadAccount(account_id)
+        guild_id = ctx.guild.id
+        acc = loadAccount(account_id, guild_id)
 
         total_value = acc.cash_on_hand
         message_string = ""
@@ -132,7 +155,8 @@ class Stocks(commands.Cog):
     async def buy(self, ctx, ticker:str, quantity:int = 1):
         ticker = ticker.upper()
         author_id = ctx.author.id
-        account = loadAccount(author_id)
+        guild_id = ctx.guild.id
+        account = loadAccount(author_id, guild_id)
         price = getPrice(ticker)
         if price < 0:
             return await ctx.send("Could not get ticker price, check the name and try again")
@@ -156,7 +180,8 @@ class Stocks(commands.Cog):
     async def sell(self, ctx, ticker:str, quantity:int = 1):
         ticker = ticker.upper()
         author_id = ctx.author.id
-        account = loadAccount(author_id)
+        guild_id = ctx.guild.id
+        account = loadAccount(author_id, guild_id)
         # check if the user has enough shares
         account.portfolio[ticker] = account.portfolio.get(ticker, [0, 0])
         shares_owned = account.portfolio[ticker][0]
