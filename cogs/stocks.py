@@ -148,7 +148,7 @@ class Stocks(commands.Cog):
             profit_string = "▲"*(profit > 0) + "▼"*(profit<0) + '${:.2f}'.format(profit) + f" ({'{:.2f}'.format(profit_percent)}%)"
             message_string += f"{ticker.ljust(8)} | {str(quantity).rjust(6)} | {'{:.2f}'.format(price).rjust(8)} | {'{:.2f}'.format(value).rjust(9)} | {profit_string}\n"
         # prepend the header now that the total value is calculated
-        message_string = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cash_on_hand:.2f}\nTotal account value: ${total_value:.2f}\n----------------------------------------\nticker | Qty |  price  |  $value  | profit\n" + message_string
+        message_string = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cash_on_hand:.2f}\nTotal account value: ${total_value:.2f}\n----------------------------------------\nticker   |   Qty  |  price   |  $value   | profit\n" + message_string
         message_string += "```"
         return await ctx.send(message_string)
 
