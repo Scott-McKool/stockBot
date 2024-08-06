@@ -1,5 +1,5 @@
 from discord.ext import commands
-from datetime import datetime
+from datetime import datetime, timedelta
 from pytz import timezone
 import yfinance as yf
 import stockBotConfig
@@ -21,11 +21,19 @@ price_cache = {}
 
 accounts_folder = stockBotConfig.BOT_DIR+"accounts/"
 
-def is_market_open() -> bool:
-    # get the current time in us est timezone 
-    dt = datetime.now(timezone('US/Eastern'))
-    # market is open on weekdays (days 0-4) between 9:30 am and 4:00 pm
-    return 0 <= dt.weekday() <= 4 and 9*60+30 <= dt.hour*60+dt.minute <= 16*60
+
+def get_expire_time():
+    '''returns the unix epoch for when the cached price for a ticker should expire if saved right now'''
+    now = datetime.now(timezone('US/Eastern'))
+    # is the market closed? (past 4 o'clock or day is sat or sun)
+    if now.hour > 16 or now.day > 4:
+        # set time to the market's next possible open (tomorrow at 9:30)
+        next_open = now + timedelta(days=1)
+        next_open =  next_open.replace(hour=9, minute=30, second=0)
+        return int(next_open.timestamp())
+
+    # if market is open, just save for a minute
+    return time.time() + 60
 
 def loadAccount(id:int, guild_id:int):
     # if a dir does not exits for this guild
@@ -61,7 +69,7 @@ def getPrice(symbol:str):
     except:
         return -1
     # put this price into the cache for later use
-    price_cache[symbol] = (price, time.time() + 60)
+    price_cache[symbol] = (price, get_expire_time())
     return price
 
 
@@ -134,8 +142,8 @@ class Stocks(commands.Cog):
 
         total_value = acc.cash_on_hand
         message_string = ""
-        for ticker, cash_on_hand in acc.portfolio.items():
-            quantity, money_spent = cash_on_hand
+        for ticker, ticker_info in acc.portfolio.items():
+            quantity, money_spent = ticker_info
             if quantity < 1:
                 continue
             price = getPrice(ticker)
