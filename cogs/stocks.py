@@ -47,23 +47,21 @@ def loadAccount(id:int, guild_id:int):
     return acc
 
 def getPrice(symbol:str):
+    symbol = symbol.upper()
     # search the price cache
     if symbol in price_cache:
-        # check the age of the data
         # if the price has not expired yet
         if time.time() < price_cache[symbol][1]:
             return price_cache[symbol][0]
     # otherwise get the price from yahoo finance
     ticker = yf.Ticker(symbol)
-    if not ticker.info:
+    price = -1
+    try:
+        price = round(ticker.fast_info["last_price"], 2)
+    except:
         return -1
-    price = round(ticker.fast_info["last_price"], 2)
     # put this price into the cache for later use
-    # if the market is closed
-    if not is_market_open():
-        # cache the price for the next 10 minutes (600 seconds)
-        # TODO find a way of getting a timestamp for when the market will next open, and set the expire time to that
-        price_cache[symbol] = (price, time.time() + 600)
+    price_cache[symbol] = (price, time.time() + 60)
     return price
 
 
