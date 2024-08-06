@@ -94,6 +94,9 @@ class Account():
         value = self.cash_on_hand
         for ticker, cash_on_hand in self.portfolio.items():
             quantity, _ = cash_on_hand
+            price = getPrice(ticker)
+            if price == -1:
+                continue
             value += getPrice(ticker) * quantity
         return value
 
@@ -114,8 +117,6 @@ class Stocks(commands.Cog):
         ticker = ticker.upper()
         price = getPrice(ticker)
 
-        if not price:
-            return await ctx.send("Could not gett ticker price, check the name and try again")
         if price < 0:
             return await ctx.send("Could not get ticker price, check the name and try again")
         
@@ -138,12 +139,14 @@ class Stocks(commands.Cog):
             if quantity < 1:
                 continue
             price = getPrice(ticker)
+            if price == -1:
+                continue
             value = price*quantity
             total_value += value
             profit = round(value - money_spent, 2)
             profit_percent = round(100 * profit / money_spent, 2)
             profit_string = "▲"*(profit > 0) + "▼"*(profit<0) + '${:.2f}'.format(profit) + f" ({'{:.2f}'.format(profit_percent)}%)"
-            message_string += f"{ticker.ljust(6)} | {str(quantity).rjust(3)} | {'{:.2f}'.format(price).rjust(7)} | {'{:.2f}'.format(value).rjust(8)} | {profit_string}\n"
+            message_string += f"{ticker.ljust(8)} | {str(quantity).rjust(6)} | {'{:.2f}'.format(price).rjust(8)} | {'{:.2f}'.format(value).rjust(9)} | {profit_string}\n"
         # prepend the header now that the total value is calculated
         message_string = f"```\nAccount ID:{acc.id}\nCash on hand ${acc.cash_on_hand:.2f}\nTotal account value: ${total_value:.2f}\n----------------------------------------\nticker | Qty |  price  |  $value  | profit\n" + message_string
         message_string += "```"
