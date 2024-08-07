@@ -1,2 +1,2 @@
 discord.py[voice]==2.2.2
-yfinance
+yfinancerequests==2.32.3
