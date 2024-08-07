@@ -30,8 +30,9 @@ for file_name in os.listdir(f"{stockBotConfig.BOT_DIR}cogs"):
 
 has_connection = False
 while(not has_connection):
-    if (get_request("http://google.com").status_code == 200):
+    if (get_request("https://google.com").status_code == 200):
         has_connection = True
+        break
     print("did not log in, not connected to internet, retrying in 10 seconds. . .")
     time.sleep(10)
 
