@@ -26,7 +26,7 @@ def get_expire_time():
     '''returns the unix epoch for when the cached price for a ticker should expire if saved right now'''
     now = datetime.now(timezone('US/Eastern'))
     # is the market closed? (past 4 o'clock or day is sat or sun)
-    if now.hour > 16 or now.day > 4:
+    if now.hour > 15 or now.weekday() > 4:
         # set time to the market's next possible open (tomorrow at 9:30)
         next_open = now + timedelta(days=1)
         next_open =  next_open.replace(hour=9, minute=30, second=0)
