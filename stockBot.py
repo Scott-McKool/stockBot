@@ -1,4 +1,5 @@
 from discord.ext import commands
+from requests import get as get_request
 import stockBotConfig
 import discord
 import asyncio
@@ -26,13 +27,13 @@ for file_name in os.listdir(f"{stockBotConfig.BOT_DIR}cogs"):
 
 # wait till an internet connection is established before trying to login
 #TODO this is kind of a hack-y solution, find a better way of running code when internet access is gained
-while(True):
-    try:
-        # will throw an error if not on internet
-        urllib.request.urlopen("http://google.com")
-    except Exception as e:
-        print("did not log in, not connected to internet, retrying in 10 seconds. . .")
-        time.sleep(10)
-        continue
-    bot.run(stockBotConfig.DISCORD_TOKEN)
-    break
+
+has_connection = False
+while(not has_connection):
+    if (get_request("https://google.com").status_code == 200):
+        has_connection = True
+        break
+    print("did not log in, not connected to internet, retrying in 10 seconds. . .")
+    time.sleep(10)
+
+bot.run(stockBotConfig.DISCORD_TOKEN)
