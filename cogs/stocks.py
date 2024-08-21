@@ -106,7 +106,7 @@ class Account():
             if price == -1:
                 continue
             value += getPrice(ticker) * quantity
-        return round(value, 2)
+        return value
 
 class Stocks(commands.Cog):
 
@@ -128,9 +128,9 @@ class Stocks(commands.Cog):
         if price < 0:
             return await ctx.send("Could not get ticker price, check the name and try again")
         
-        total_price = round(price * quantity, 2)
+        total_price = price * quantity
 
-        return await ctx.send(f"Price of {quantity} {ticker} shares: {total_price:.2f}")
+        return await ctx.send(f"Price of {quantity} {ticker} shares: {total_price}")
 
     @commands.command()
     async def portfolio(self, ctx, member:discord.Member = None):
